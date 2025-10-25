@@ -140,6 +140,11 @@ def main():
             # Print all arguments separated by spaces
             output = ' '.join(parts[1:]) if len(parts) > 1 else ''
             
+            # Create error file if specified (even if empty, since echo doesn't write to stderr)
+            if error_file:
+                with open(error_file, 'w') as f:
+                    pass  # Create empty file
+            
             if output_file:
                 # Write to file
                 with open(output_file, 'w') as f:
