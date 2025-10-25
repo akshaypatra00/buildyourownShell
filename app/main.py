@@ -5,7 +5,7 @@ import subprocess
 
 def main():
     # List of builtin commands
-    builtins = ["echo", "exit", "type", "pwd"]
+    builtins = ["echo", "exit", "type", "pwd", "cd"]
     
     while True:
         sys.stdout.write("$ ")
@@ -66,6 +66,20 @@ def main():
         elif cmd_name == "pwd":
             # Print current working directory
             print(os.getcwd())
+        
+        # Check if command is "cd"
+        elif cmd_name == "cd":
+            if len(parts) > 1:
+                directory = parts[1]
+                # Try to change directory
+                try:
+                    os.chdir(directory)
+                except FileNotFoundError:
+                    print(f"cd: {directory}: No such file or directory")
+                except NotADirectoryError:
+                    print(f"cd: {directory}: No such file or directory")
+                except PermissionError:
+                    print(f"cd: {directory}: Permission denied")
         
         else:
             # Try to execute as external program
