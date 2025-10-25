@@ -19,8 +19,14 @@ def main():
                 exit_code = 0
             sys.exit(exit_code)
         
-        # Print error message for other commands
-        print(f"{command}: command not found")
+        # Check if command is "echo"
+        if command.startswith("echo "):
+            # Get everything after "echo "
+            text = command[5:]  # Skip "echo " (5 characters)
+            print(text)
+        else:
+            # Print error message for other commands
+            print(f"{command}: command not found")
 
 
 if __name__ == "__main__":
