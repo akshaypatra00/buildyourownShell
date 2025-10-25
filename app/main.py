@@ -58,8 +58,9 @@ def parse_command(command):
 
 
 def parse_redirects(parts):
-    """Extract redirection operators and return (command_parts, output_file, error_file)"""
+    """Extract redirection operators and return (command_parts, output_file, output_mode, error_file)"""
     output_file = None
+    output_mode = 'w'  # 'w' for write, 'a' for append
     error_file = None
     command_parts = []
     i = 0
@@ -67,21 +68,44 @@ def parse_redirects(parts):
     while i < len(parts):
         part = parts[i]
         
-        # Check for stdout redirection: > or 1>
-        if part == '>' or part == '1>':
+        # Check for append stdout redirection: >> or 1>>
+        if part == '>>' or part == '1>>':
             # Next part should be the filename
             if i + 1 < len(parts):
                 output_file = parts[i + 1]
+                output_mode = 'a'
+                i += 2
+                continue
+        elif part.startswith('1>>'):
+            # 1>>file (no space)
+            output_file = part[3:]
+            output_mode = 'a'
+            i += 1
+            continue
+        elif part.startswith('>>'):
+            # >>file (no space)
+            output_file = part[2:]
+            output_mode = 'a'
+            i += 1
+            continue
+        # Check for stdout redirection: > or 1>
+        elif part == '>' or part == '1>':
+            # Next part should be the filename
+            if i + 1 < len(parts):
+                output_file = parts[i + 1]
+                output_mode = 'w'
                 i += 2
                 continue
         elif part.startswith('1>'):
             # 1>file (no space)
             output_file = part[2:]
+            output_mode = 'w'
             i += 1
             continue
         elif part.startswith('>') and not part.startswith('>>'):
             # >file (no space) - but not >>
             output_file = part[1:]
+            output_mode = 'w'
             i += 1
             continue
         # Check for stderr redirection: 2>
@@ -100,7 +124,7 @@ def parse_redirects(parts):
         command_parts.append(part)
         i += 1
     
-    return command_parts, output_file, error_file
+    return command_parts, output_file, output_mode, error_file
 
 
 def main():
@@ -120,7 +144,7 @@ def main():
             continue
         
         # Extract redirections
-        parts, output_file, error_file = parse_redirects(parts)
+        parts, output_file, output_mode, error_file = parse_redirects(parts)
         if not parts:
             continue
         
@@ -146,8 +170,8 @@ def main():
                     pass  # Create empty file
             
             if output_file:
-                # Write to file
-                with open(output_file, 'w') as f:
+                # Write to file (with specified mode: 'w' or 'a')
+                with open(output_file, output_mode) as f:
                     f.write(output + '\n')
             else:
                 # Print to stdout
@@ -180,7 +204,7 @@ def main():
                         result = f"{target_cmd}: not found"
                 
                 if output_file:
-                    with open(output_file, 'w') as f:
+                    with open(output_file, output_mode) as f:
                         f.write(result + '\n')
                 else:
                     print(result)
@@ -191,7 +215,7 @@ def main():
             result = os.getcwd()
             
             if output_file:
-                with open(output_file, 'w') as f:
+                with open(output_file, output_mode) as f:
                     f.write(result + '\n')
             else:
                 print(result)
@@ -234,7 +258,7 @@ def main():
                 # Check if file exists and is executable
                 if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
                     # Execute the program with arguments
-                    stdout_dest = open(output_file, 'w') if output_file else None
+                    stdout_dest = open(output_file, output_mode) if output_file else None
                     stderr_dest = open(error_file, 'w') if error_file else None
                     
                     result = subprocess.run(
