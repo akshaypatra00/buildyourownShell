@@ -57,6 +57,39 @@ def parse_command(command):
     return parts
 
 
+def parse_redirects(parts):
+    """Extract redirection operators and return (command_parts, output_file)"""
+    output_file = None
+    command_parts = []
+    i = 0
+    
+    while i < len(parts):
+        part = parts[i]
+        
+        # Check for output redirection: > or 1>
+        if part == '>' or part == '1>':
+            # Next part should be the filename
+            if i + 1 < len(parts):
+                output_file = parts[i + 1]
+                i += 2
+                continue
+        elif part.startswith('1>'):
+            # 1>file (no space)
+            output_file = part[2:]
+            i += 1
+            continue
+        elif part.startswith('>'):
+            # >file (no space)
+            output_file = part[1:]
+            i += 1
+            continue
+        
+        command_parts.append(part)
+        i += 1
+    
+    return command_parts, output_file
+
+
 def main():
     # List of builtin commands
     builtins = ["echo", "exit", "type", "pwd", "cd"]
@@ -70,6 +103,11 @@ def main():
         
         # Parse command with quote handling
         parts = parse_command(command)
+        if not parts:
+            continue
+        
+        # Extract redirections
+        parts, output_file = parse_redirects(parts)
         if not parts:
             continue
         
@@ -87,10 +125,15 @@ def main():
         # Check if command is "echo"
         elif cmd_name == "echo":
             # Print all arguments separated by spaces
-            if len(parts) > 1:
-                print(' '.join(parts[1:]))
+            output = ' '.join(parts[1:]) if len(parts) > 1 else ''
+            
+            if output_file:
+                # Write to file
+                with open(output_file, 'w') as f:
+                    f.write(output + '\n')
             else:
-                print()
+                # Print to stdout
+                print(output)
         
         # Check if command is "type"
         elif cmd_name == "type":
@@ -100,7 +143,7 @@ def main():
                 
                 # First, check if it's a builtin
                 if target_cmd in builtins:
-                    print(f"{target_cmd} is a shell builtin")
+                    result = f"{target_cmd} is a shell builtin"
                 else:
                     # Search in PATH
                     found = False
@@ -111,17 +154,29 @@ def main():
                         file_path = os.path.join(directory, target_cmd)
                         # Check if file exists and is executable
                         if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
-                            print(f"{target_cmd} is {file_path}")
+                            result = f"{target_cmd} is {file_path}"
                             found = True
                             break
                     
                     if not found:
-                        print(f"{target_cmd}: not found")
+                        result = f"{target_cmd}: not found"
+                
+                if output_file:
+                    with open(output_file, 'w') as f:
+                        f.write(result + '\n')
+                else:
+                    print(result)
         
         # Check if command is "pwd"
         elif cmd_name == "pwd":
             # Print current working directory
-            print(os.getcwd())
+            result = os.getcwd()
+            
+            if output_file:
+                with open(output_file, 'w') as f:
+                    f.write(result + '\n')
+            else:
+                print(result)
         
         # Check if command is "cd"
         elif cmd_name == "cd":
@@ -161,7 +216,12 @@ def main():
                 # Check if file exists and is executable
                 if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
                     # Execute the program with arguments
-                    result = subprocess.run([cmd_name] + parts[1:])
+                    if output_file:
+                        # Redirect stdout to file
+                        with open(output_file, 'w') as f:
+                            result = subprocess.run([cmd_name] + parts[1:], stdout=f)
+                    else:
+                        result = subprocess.run([cmd_name] + parts[1:])
                     found = True
                     break
             
