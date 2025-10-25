@@ -4,22 +4,23 @@ import subprocess
 
 
 def parse_command(command):
-    """Parse command handling single quotes"""
+    """Parse command handling single and double quotes"""
     parts = []
     current = []
-    in_quotes = False
+    in_single_quotes = False
+    in_double_quotes = False
     i = 0
     
     while i < len(command):
         char = command[i]
         
-        if char == "'" and not in_quotes:
-            # Start of quoted section
-            in_quotes = True
-        elif char == "'" and in_quotes:
-            # End of quoted section
-            in_quotes = False
-        elif char == ' ' and not in_quotes:
+        if char == "'" and not in_double_quotes:
+            # Toggle single quotes (unless inside double quotes)
+            in_single_quotes = not in_single_quotes
+        elif char == '"' and not in_single_quotes:
+            # Toggle double quotes (unless inside single quotes)
+            in_double_quotes = not in_double_quotes
+        elif char == ' ' and not in_single_quotes and not in_double_quotes:
             # Space outside quotes - separator
             if current:
                 parts.append(''.join(current))
