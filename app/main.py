@@ -3,6 +3,40 @@ import os
 import subprocess
 
 
+def parse_command(command):
+    """Parse command handling single quotes"""
+    parts = []
+    current = []
+    in_quotes = False
+    i = 0
+    
+    while i < len(command):
+        char = command[i]
+        
+        if char == "'" and not in_quotes:
+            # Start of quoted section
+            in_quotes = True
+        elif char == "'" and in_quotes:
+            # End of quoted section
+            in_quotes = False
+        elif char == ' ' and not in_quotes:
+            # Space outside quotes - separator
+            if current:
+                parts.append(''.join(current))
+                current = []
+        else:
+            # Regular character or space inside quotes
+            current.append(char)
+        
+        i += 1
+    
+    # Add last part if any
+    if current:
+        parts.append(''.join(current))
+    
+    return parts
+
+
 def main():
     # List of builtin commands
     builtins = ["echo", "exit", "type", "pwd", "cd"]
@@ -14,8 +48,8 @@ def main():
         # Wait for user input
         command = input()
         
-        # Split command into parts
-        parts = command.split()
+        # Parse command with quote handling
+        parts = parse_command(command)
         if not parts:
             continue
         
@@ -32,9 +66,11 @@ def main():
         
         # Check if command is "echo"
         elif cmd_name == "echo":
-            # Get everything after "echo "
-            text = command[5:]  # Skip "echo " (5 characters)
-            print(text)
+            # Print all arguments separated by spaces
+            if len(parts) > 1:
+                print(' '.join(parts[1:]))
+            else:
+                print()
         
         # Check if command is "type"
         elif cmd_name == "type":
@@ -105,7 +141,6 @@ def main():
                 # Check if file exists and is executable
                 if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
                     # Execute the program with arguments
-                    # Pass cmd_name (not file_path) as first argument
                     result = subprocess.run([cmd_name] + parts[1:])
                     found = True
                     break
