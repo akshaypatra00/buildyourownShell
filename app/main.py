@@ -74,15 +74,11 @@ def parse_arguments(command: str) -> Tuple[str, List[str], str, str]:
     return (cmd, args, filename, redirect_mode)
 
 
-def execute_builtin(cmd, args, input_data=None, output_file=None):
-    """Execute a builtin command with optional input and output redirection"""
+def execute_builtin(cmd, args, stdin_pipe=None):
+    """Execute a builtin command and return output as string"""
     import io
     
-    # Capture output
-    if output_file:
-        output = output_file
-    else:
-        output = io.StringIO()
+    output = io.StringIO()
     
     if cmd == "echo":
         print(" ".join(args), file=output)
@@ -98,9 +94,73 @@ def execute_builtin(cmd, args, input_data=None, output_file=None):
     elif cmd == "pwd":
         print(os.getcwd(), file=output)
     
-    if not output_file:
-        return output.getvalue()
-    return ""
+    return output.getvalue()
+
+
+def execute_pipeline(command: str):
+    """Execute a pipeline of commands"""
+    # Split by pipe
+    commands_list = command.split('|')
+    commands_list = [cmd.strip() for cmd in commands_list]
+    
+    processes = []
+    
+    for i, cmd_str in enumerate(commands_list):
+        cmd_parts = shlex.split(cmd_str)
+        cmd = cmd_parts[0]
+        args = cmd_parts[1:] if len(cmd_parts) > 1 else []
+        
+        # Determine stdin for this command
+        if i == 0:
+            stdin = None
+        else:
+            stdin = processes[-1].stdout
+        
+        # Check if it's a builtin
+        if cmd in ["echo", "type", "pwd"]:
+            # For builtins in pipeline
+            if i == len(commands_list) - 1:
+                # Last command - read from previous and output to stdout
+                if stdin:
+                    stdin_data = stdin.read()
+                    stdin.close()
+                output = execute_builtin(cmd, args)
+                sys.stdout.write(output)
+                sys.stdout.flush()
+            else:
+                # Middle command - not typical but handle it
+                output = execute_builtin(cmd, args)
+                proc = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+                proc.stdin.write(output)
+                proc.stdin.close()
+                processes.append(proc)
+        else:
+            # External command
+            if cmd in executables:
+                cmd_path = executables[cmd]
+            else:
+                cmd_path = shutil.which(cmd)
+            
+            if cmd_path:
+                if i == len(commands_list) - 1:
+                    # Last command
+                    proc = subprocess.Popen([cmd_path] + args, stdin=stdin)
+                    processes.append(proc)
+                else:
+                    # Not last command
+                    proc = subprocess.Popen([cmd_path] + args, stdin=stdin, stdout=subprocess.PIPE)
+                    processes.append(proc)
+                
+                # Close the previous stdout after passing it
+                if stdin and i > 0:
+                    processes[-2].stdout.close()
+            else:
+                print("{}: command not found".format(cmd))
+                return
+    
+    # Wait for all processes to complete
+    for proc in processes:
+        proc.wait()
 
 
 def parse_command(command: str):
@@ -185,54 +245,6 @@ def parse_command(command: str):
         return
 
     print("{}: command not found".format(cmd), file=file)
-
-
-def execute_pipeline(command: str):
-    """Execute a pipeline of commands"""
-    # Split by pipe
-    commands_list = command.split('|')
-    commands_list = [cmd.strip() for cmd in commands_list]
-    
-    prev_output = None
-    
-    for i, cmd_str in enumerate(commands_list):
-        cmd, args, _, _ = parse_arguments(cmd_str)
-        
-        # Check if it's a builtin
-        if cmd in ["echo", "type", "pwd"]:
-            # Execute builtin
-            if i == len(commands_list) - 1:
-                # Last command - output to stdout
-                output = execute_builtin(cmd, args, prev_output, sys.stdout)
-            else:
-                # Not last - capture output
-                output = execute_builtin(cmd, args, prev_output)
-                prev_output = output
-        else:
-            # External command
-            if cmd in executables:
-                cmd_path = executables[cmd]
-            else:
-                cmd_path = shutil.which(cmd)
-            
-            if cmd_path:
-                if i == len(commands_list) - 1:
-                    # Last command - output to stdout
-                    if prev_output:
-                        subprocess.run([cmd_path] + args, input=prev_output, text=True)
-                    else:
-                        subprocess.run([cmd_path] + args)
-                else:
-                    # Not last - capture output
-                    if prev_output:
-                        result = subprocess.run([cmd_path] + args, input=prev_output, 
-                                              capture_output=True, text=True)
-                    else:
-                        result = subprocess.run([cmd_path] + args, capture_output=True, text=True)
-                    prev_output = result.stdout
-            else:
-                print("{}: command not found".format(cmd))
-                return
 
 
 def main():
