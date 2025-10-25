@@ -227,7 +227,7 @@ def completer(text, state):
     
     # If we're at state 0 and there are multiple matches
     if state == 0 and len(all_matches) > 1:
-        # If the common prefix is longer than the current text, complete to it
+        # If the common prefix is longer than the current text, complete to it (WITHOUT space)
         if len(common_prefix) > len(text):
             return common_prefix
         
