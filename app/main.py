@@ -74,7 +74,8 @@ def main():
                 # Check if file exists and is executable
                 if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
                     # Execute the program with arguments
-                    result = subprocess.run([file_path] + parts[1:])
+                    # Pass cmd_name (not file_path) as first argument
+                    result = subprocess.run([cmd_name] + parts[1:])
                     found = True
                     break
             
