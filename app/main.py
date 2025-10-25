@@ -193,7 +193,7 @@ def completer(text, state):
     # Combine all matches and sort alphabetically
     all_matches = sorted(builtin_matches + executable_matches)
     
-    # If we're at state 0 and there are multiple matches
+    # If we're at state 0 and there are multiple matches (more than 1)
     if state == 0 and len(all_matches) > 1:
         completion_state['attempt'] += 1
         
@@ -213,7 +213,18 @@ def completer(text, state):
             completion_state['attempt'] = 0
             return None
     
-    # Single match or returning matches normally
+    # If there's exactly one match, complete it immediately
+    if len(all_matches) == 1:
+        if state == 0:
+            return all_matches[0] + ' '
+        else:
+            return None
+    
+    # If there are no matches, return None
+    if len(all_matches) == 0:
+        return None
+    
+    # For multiple matches after displaying, return them with space
     matches_with_space = [cmd + ' ' for cmd in all_matches]
     
     # Return the state-th match
