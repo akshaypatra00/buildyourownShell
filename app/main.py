@@ -58,10 +58,11 @@ def parse_command(command):
 
 
 def parse_redirects(parts):
-    """Extract redirection operators and return (command_parts, output_file, output_mode, error_file)"""
+    """Extract redirection operators and return (command_parts, output_file, output_mode, error_file, error_mode)"""
     output_file = None
     output_mode = 'w'  # 'w' for write, 'a' for append
     error_file = None
+    error_mode = 'w'  # 'w' for write, 'a' for append
     command_parts = []
     i = 0
     
@@ -82,10 +83,24 @@ def parse_redirects(parts):
             output_mode = 'a'
             i += 1
             continue
-        elif part.startswith('>>'):
-            # >>file (no space)
+        elif part.startswith('>>') and not part.startswith('2>>'):
+            # >>file (no space) - but not 2>>
             output_file = part[2:]
             output_mode = 'a'
+            i += 1
+            continue
+        # Check for append stderr redirection: 2>>
+        elif part == '2>>':
+            # Next part should be the filename
+            if i + 1 < len(parts):
+                error_file = parts[i + 1]
+                error_mode = 'a'
+                i += 2
+                continue
+        elif part.startswith('2>>'):
+            # 2>>file (no space)
+            error_file = part[3:]
+            error_mode = 'a'
             i += 1
             continue
         # Check for stdout redirection: > or 1>
@@ -96,7 +111,7 @@ def parse_redirects(parts):
                 output_mode = 'w'
                 i += 2
                 continue
-        elif part.startswith('1>'):
+        elif part.startswith('1>') and not part.startswith('1>>'):
             # 1>file (no space)
             output_file = part[2:]
             output_mode = 'w'
@@ -113,18 +128,20 @@ def parse_redirects(parts):
             # Next part should be the filename
             if i + 1 < len(parts):
                 error_file = parts[i + 1]
+                error_mode = 'w'
                 i += 2
                 continue
-        elif part.startswith('2>'):
+        elif part.startswith('2>') and not part.startswith('2>>'):
             # 2>file (no space)
             error_file = part[2:]
+            error_mode = 'w'
             i += 1
             continue
         
         command_parts.append(part)
         i += 1
     
-    return command_parts, output_file, output_mode, error_file
+    return command_parts, output_file, output_mode, error_file, error_mode
 
 
 def main():
@@ -144,7 +161,7 @@ def main():
             continue
         
         # Extract redirections
-        parts, output_file, output_mode, error_file = parse_redirects(parts)
+        parts, output_file, output_mode, error_file, error_mode = parse_redirects(parts)
         if not parts:
             continue
         
@@ -166,8 +183,8 @@ def main():
             
             # Create error file if specified (even if empty, since echo doesn't write to stderr)
             if error_file:
-                with open(error_file, 'w') as f:
-                    pass  # Create empty file
+                with open(error_file, error_mode) as f:
+                    pass  # Create empty file or append nothing
             
             if output_file:
                 # Write to file (with specified mode: 'w' or 'a')
@@ -259,7 +276,7 @@ def main():
                 if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
                     # Execute the program with arguments
                     stdout_dest = open(output_file, output_mode) if output_file else None
-                    stderr_dest = open(error_file, 'w') if error_file else None
+                    stderr_dest = open(error_file, error_mode) if error_file else None
                     
                     result = subprocess.run(
                         [cmd_name] + parts[1:],
