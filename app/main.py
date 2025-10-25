@@ -5,7 +5,7 @@ import subprocess
 
 def main():
     # List of builtin commands
-    builtins = ["echo", "exit", "type"]
+    builtins = ["echo", "exit", "type", "pwd"]
     
     while True:
         sys.stdout.write("$ ")
@@ -61,6 +61,11 @@ def main():
                     
                     if not found:
                         print(f"{target_cmd}: not found")
+        
+        # Check if command is "pwd"
+        elif cmd_name == "pwd":
+            # Print current working directory
+            print(os.getcwd())
         
         else:
             # Try to execute as external program
