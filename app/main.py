@@ -145,16 +145,48 @@ def parse_redirects(parts):
     return command_parts, output_file, output_mode, error_file, error_mode
 
 
+def get_executables_in_path(text):
+    """Find all executables in PATH that start with text"""
+    executables = []
+    path_env = os.environ.get("PATH", "")
+    paths = path_env.split(os.pathsep)
+    
+    for directory in paths:
+        # Skip if directory doesn't exist
+        if not os.path.isdir(directory):
+            continue
+        
+        try:
+            # List all files in the directory
+            for filename in os.listdir(directory):
+                # Check if it starts with the text
+                if filename.startswith(text):
+                    file_path = os.path.join(directory, filename)
+                    # Check if it's a file and executable
+                    if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
+                        if filename not in executables:
+                            executables.append(filename)
+        except PermissionError:
+            # Skip directories we can't read
+            continue
+    
+    return executables
+
+
 def completer(text, state):
     """Tab completion function for readline"""
     builtins = ["echo", "exit", "type", "pwd", "cd"]
     
-    # Filter builtins that start with the text
-    matches = [cmd + ' ' for cmd in builtins if cmd.startswith(text)]
+    # Get all matches: builtins + executables in PATH
+    builtin_matches = [cmd for cmd in builtins if cmd.startswith(text)]
+    executable_matches = get_executables_in_path(text)
+    
+    # Combine and add space at the end
+    all_matches = [cmd + ' ' for cmd in builtin_matches + executable_matches]
     
     # Return the state-th match
-    if state < len(matches):
-        return matches[state]
+    if state < len(all_matches):
+        return all_matches[state]
     else:
         return None
 
