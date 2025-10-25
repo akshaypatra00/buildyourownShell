@@ -15,11 +15,24 @@ def parse_command(command):
         char = command[i]
         
         if char == '\\' and not in_single_quotes:
-            # Backslash escape (works outside quotes and inside double quotes)
-            # Skip the backslash and add the next character literally
+            # Backslash escape
             if i + 1 < len(command):
-                i += 1
-                current.append(command[i])
+                next_char = command[i + 1]
+                
+                if in_double_quotes:
+                    # Inside double quotes: only escape special characters
+                    # Special characters: \ " $ ` and newline
+                    if next_char in ['\\', '"', '$', '`', '\n']:
+                        # Escape the special character
+                        i += 1
+                        current.append(next_char)
+                    else:
+                        # Not a special character, keep the backslash
+                        current.append(char)
+                else:
+                    # Outside quotes: escape any character
+                    i += 1
+                    current.append(next_char)
         elif char == "'" and not in_double_quotes:
             # Toggle single quotes (unless inside double quotes)
             in_single_quotes = not in_single_quotes
