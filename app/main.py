@@ -48,7 +48,14 @@ def completer(text, state):
 
 
 def parse_arguments(command: str) -> Tuple[str, List[str], str, str]:
-    command_parts = shlex.split(command)
+    try:
+        command_parts = shlex.split(command)
+    except:
+        return (command, [], None, "")
+    
+    if len(command_parts) == 0:
+        return ("", [], None, "")
+    
     filename = None
     redirect_mode = ""
     cmd = command_parts[0]
@@ -68,8 +75,12 @@ def parse_arguments(command: str) -> Tuple[str, List[str], str, str]:
             break
 
     if out_op_idx != -1:
-        filename = args[out_op_idx + 1]
-        args = args[:out_op_idx]
+        if out_op_idx + 1 < len(args):
+            filename = args[out_op_idx + 1]
+            args = args[:out_op_idx]
+        else:
+            # Redirection operator without filename
+            args = args[:out_op_idx]
 
     return (cmd, args, filename, redirect_mode)
 
@@ -83,7 +94,15 @@ def execute_pipeline(command: str):
     processes = []
     
     for i, cmd_str in enumerate(commands_list):
-        cmd_parts = shlex.split(cmd_str)
+        try:
+            cmd_parts = shlex.split(cmd_str)
+        except:
+            print("Parse error")
+            return
+        
+        if len(cmd_parts) == 0:
+            continue
+            
         cmd = cmd_parts[0]
         args = cmd_parts[1:] if len(cmd_parts) > 1 else []
         
@@ -134,7 +153,7 @@ def execute_pipeline(command: str):
                     processes.append(proc)
                 
                 # Close the previous stdout after passing it
-                if stdin and i > 0:
+                if stdin and i > 0 and len(processes) > 1:
                     processes[-2].stdout.close()
             else:
                 print("{}: command not found".format(cmd))
@@ -152,19 +171,26 @@ def parse_command(command: str):
         return
     
     cmd, args, filename, redirect_mode = parse_arguments(command)
+    
+    if not cmd:
+        return
 
     # Handle file redirection
     stdout_file = None
     stderr_file = None
     
     if redirect_mode == "1>" or redirect_mode == ">":
-        stdout_file = open(filename, "w")
+        if filename:
+            stdout_file = open(filename, "w")
     elif redirect_mode == "2>":
-        stderr_file = open(filename, "w")
+        if filename:
+            stderr_file = open(filename, "w")
     elif redirect_mode == ">>" or redirect_mode == "1>>":
-        stdout_file = open(filename, "a")
+        if filename:
+            stdout_file = open(filename, "a")
     elif redirect_mode == "2>>":
-        stderr_file = open(filename, "a")
+        if filename:
+            stderr_file = open(filename, "a")
 
     # Determine output destination
     if stdout_file:
@@ -246,18 +272,30 @@ def parse_command(command: str):
 
 def main():
     # Wait for user input
-    command = input("$ ")
-    parse_command(command)
-    main()
+    try:
+        command = input("$ ")
+        parse_command(command)
+        main()
+    except EOFError:
+        sys.exit(0)
+    except KeyboardInterrupt:
+        print()
+        main()
 
 
 def load_exec():
-    paths = os.getenv("PATH").split(os.pathsep)
+    paths = os.getenv("PATH")
+    if not paths:
+        return
+    paths = paths.split(os.pathsep)
     for dir in paths:
         if os.path.isdir(dir):
-            for file in os.listdir(dir):
-                if file not in executables and os.path.isfile(os.path.join(dir, file)):
-                    executables[file] = os.path.join(dir, file)
+            try:
+                for file in os.listdir(dir):
+                    if file not in executables and os.path.isfile(os.path.join(dir, file)):
+                        executables[file] = os.path.join(dir, file)
+            except PermissionError:
+                continue
 
 
 if __name__ == "__main__":
