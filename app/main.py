@@ -71,15 +71,27 @@ def main():
         elif cmd_name == "cd":
             if len(parts) > 1:
                 directory = parts[1]
+                
+                # Handle ~ for home directory
+                if directory.startswith("~"):
+                    home = os.environ.get("HOME")
+                    if home:
+                        # Replace ~ with home directory
+                        if directory == "~":
+                            directory = home
+                        else:
+                            # Handle paths like ~/something
+                            directory = home + directory[1:]
+                
                 # Try to change directory
                 try:
                     os.chdir(directory)
                 except FileNotFoundError:
-                    print(f"cd: {directory}: No such file or directory")
+                    print(f"cd: {parts[1]}: No such file or directory")
                 except NotADirectoryError:
-                    print(f"cd: {directory}: No such file or directory")
+                    print(f"cd: {parts[1]}: No such file or directory")
                 except PermissionError:
-                    print(f"cd: {directory}: Permission denied")
+                    print(f"cd: {parts[1]}: Permission denied")
         
         else:
             # Try to execute as external program
