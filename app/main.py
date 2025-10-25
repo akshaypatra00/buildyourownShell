@@ -74,29 +74,6 @@ def parse_arguments(command: str) -> Tuple[str, List[str], str, str]:
     return (cmd, args, filename, redirect_mode)
 
 
-def execute_builtin(cmd, args, stdin_pipe=None):
-    """Execute a builtin command and return output as string"""
-    import io
-    
-    output = io.StringIO()
-    
-    if cmd == "echo":
-        print(" ".join(args), file=output)
-    elif cmd == "type":
-        if len(args) == 0:
-            print("type: missing argument", file=output)
-        elif args[0] in commands:
-            print("{} is a shell builtin".format(args[0]), file=output)
-        elif path := shutil.which(args[0]):
-            print("{} is {}".format(args[0], path), file=output)
-        else:
-            print("{}: not found".format(args[0]), file=output)
-    elif cmd == "pwd":
-        print(os.getcwd(), file=output)
-    
-    return output.getvalue()
-
-
 def execute_pipeline(command: str):
     """Execute a pipeline of commands"""
     # Split by pipe
@@ -118,22 +95,27 @@ def execute_pipeline(command: str):
         
         # Check if it's a builtin
         if cmd in ["echo", "type", "pwd"]:
-            # For builtins in pipeline
+            # For builtins in pipeline - last command only
             if i == len(commands_list) - 1:
-                # Last command - read from previous and output to stdout
+                # Read and discard previous output
                 if stdin:
-                    stdin_data = stdin.read()
+                    stdin.read()
                     stdin.close()
-                output = execute_builtin(cmd, args)
-                sys.stdout.write(output)
-                sys.stdout.flush()
-            else:
-                # Middle command - not typical but handle it
-                output = execute_builtin(cmd, args)
-                proc = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-                proc.stdin.write(output)
-                proc.stdin.close()
-                processes.append(proc)
+                
+                # Execute builtin normally to stdout
+                if cmd == "echo":
+                    print(" ".join(args))
+                elif cmd == "type":
+                    if len(args) == 0:
+                        print("type: missing argument")
+                    elif args[0] in commands:
+                        print("{} is a shell builtin".format(args[0]))
+                    elif path := shutil.which(args[0]):
+                        print("{} is {}".format(args[0], path))
+                    else:
+                        print("{}: not found".format(args[0]))
+                elif cmd == "pwd":
+                    print(os.getcwd())
         else:
             # External command
             if cmd in executables:
@@ -171,39 +153,47 @@ def parse_command(command: str):
     
     cmd, args, filename, redirect_mode = parse_arguments(command)
 
+    # Handle file redirection
+    stdout_file = None
+    stderr_file = None
+    
     if redirect_mode == "1>" or redirect_mode == ">":
-        file = open(filename, "w")
+        stdout_file = open(filename, "w")
     elif redirect_mode == "2>":
-        file = open(filename, "w")
-        sys.stderr = file
+        stderr_file = open(filename, "w")
     elif redirect_mode == ">>" or redirect_mode == "1>>":
-        file = open(filename, "a")
+        stdout_file = open(filename, "a")
     elif redirect_mode == "2>>":
-        file = open(filename, "a")
-        sys.stderr = file
+        stderr_file = open(filename, "a")
+
+    # Determine output destination
+    if stdout_file:
+        output = stdout_file
     else:
-        file = sys.stdout
+        output = sys.stdout
 
     if cmd == "echo":
-        print(" ".join(args), file=file)
-        if redirect_mode in ["2>", "2>>"]:
-            sys.stderr = sys.__stderr__
+        print(" ".join(args), file=output)
+        if stdout_file:
+            stdout_file.close()
+        if stderr_file:
+            stderr_file.close()
         return
 
     if cmd == "type":
         if len(args) == 0:
-            print("{}: missing file operand".format(command), file=file)
-            return
-
-        if args[0] in commands:
-            print("{} is a shell builtin".format(args[0]), file=file)
-            return
-
-        if path := shutil.which(args[0]):
-            print("{} is {}".format(args[0], path), file=file)
-            return
-
-        print("{}: not found".format(args[0]), file=file)
+            print("{}: missing file operand".format(command), file=output)
+        elif args[0] in commands:
+            print("{} is a shell builtin".format(args[0]), file=output)
+        elif path := shutil.which(args[0]):
+            print("{} is {}".format(args[0], path), file=output)
+        else:
+            print("{}: not found".format(args[0]), file=output)
+        
+        if stdout_file:
+            stdout_file.close()
+        if stderr_file:
+            stderr_file.close()
         return
 
     if cmd == "exit":
@@ -213,7 +203,11 @@ def parse_command(command: str):
         sys.exit(err_code)
 
     if cmd == "pwd":
-        print(os.getcwd(), file=file)
+        print(os.getcwd(), file=output)
+        if stdout_file:
+            stdout_file.close()
+        if stderr_file:
+            stderr_file.close()
         return
 
     if cmd == "cd":
@@ -222,29 +216,32 @@ def parse_command(command: str):
             if os.path.exists(dir_path):
                 os.chdir(dir_path)
             else:
-                print(
-                    "{}: {}: No such file or directory".format(cmd, args[0]),
-                    file=sys.stdout,
-                )
-            return
-
-    if cmd in executables.keys():
-        if redirect_mode in ["1>", ">"]:
-            subprocess.run([executables[cmd]] + args, stdout=file)
-        elif redirect_mode in [">>", "1>>"]:
-            subprocess.run([executables[cmd]] + args, stdout=file)
-        elif redirect_mode in ["2>"]:
-            subprocess.run([executables[cmd]] + args, stderr=file)
-        elif redirect_mode in ["2>>"]:
-            subprocess.run([executables[cmd]] + args, stderr=file)
-        else:
-            subprocess.run([executables[cmd]] + args)
-        
-        if redirect_mode in ["2>", "2>>"]:
-            sys.stderr = sys.__stderr__
+                print("{}: {}: No such file or directory".format(cmd, args[0]))
+        if stdout_file:
+            stdout_file.close()
+        if stderr_file:
+            stderr_file.close()
         return
 
-    print("{}: command not found".format(cmd), file=file)
+    # External commands
+    if cmd in executables:
+        cmd_path = executables[cmd]
+    else:
+        cmd_path = shutil.which(cmd)
+    
+    if cmd_path:
+        subprocess.run([cmd_path] + args, stdout=stdout_file, stderr=stderr_file)
+        if stdout_file:
+            stdout_file.close()
+        if stderr_file:
+            stderr_file.close()
+        return
+
+    print("{}: command not found".format(cmd), file=output)
+    if stdout_file:
+        stdout_file.close()
+    if stderr_file:
+        stderr_file.close()
 
 
 def main():
