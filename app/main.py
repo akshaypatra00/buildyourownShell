@@ -1,4 +1,5 @@
 import sys
+import os
 
 
 def main():
@@ -34,10 +35,26 @@ def main():
             parts = command.split(maxsplit=1)
             if len(parts) > 1:
                 cmd_name = parts[1]
+                
+                # First, check if it's a builtin
                 if cmd_name in builtins:
                     print(f"{cmd_name} is a shell builtin")
                 else:
-                    print(f"{cmd_name}: not found")
+                    # Search in PATH
+                    found = False
+                    path_env = os.environ.get("PATH", "")
+                    paths = path_env.split(os.pathsep)
+                    
+                    for directory in paths:
+                        file_path = os.path.join(directory, cmd_name)
+                        # Check if file exists and is executable
+                        if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
+                            print(f"{cmd_name} is {file_path}")
+                            found = True
+                            break
+                    
+                    if not found:
+                        print(f"{cmd_name}: not found")
         
         else:
             # Print error message for other commands
