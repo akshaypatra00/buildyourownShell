@@ -295,6 +295,7 @@ def main():
             if not found:
                 # Print error message for commands not found
                 print(f"{cmd_name}: command not found")
+                print(akshay)
 
 
 if __name__ == "__main__":
