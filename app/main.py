@@ -4,7 +4,7 @@ import subprocess
 
 
 def parse_command(command):
-    """Parse command handling single and double quotes"""
+    """Parse command handling single quotes, double quotes, and backslashes"""
     parts = []
     current = []
     in_single_quotes = False
@@ -14,7 +14,13 @@ def parse_command(command):
     while i < len(command):
         char = command[i]
         
-        if char == "'" and not in_double_quotes:
+        if char == '\\' and not in_single_quotes:
+            # Backslash escape (works outside quotes and inside double quotes)
+            # Skip the backslash and add the next character literally
+            if i + 1 < len(command):
+                i += 1
+                current.append(command[i])
+        elif char == "'" and not in_double_quotes:
             # Toggle single quotes (unless inside double quotes)
             in_single_quotes = not in_single_quotes
         elif char == '"' and not in_single_quotes:
