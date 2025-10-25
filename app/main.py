@@ -58,15 +58,16 @@ def parse_command(command):
 
 
 def parse_redirects(parts):
-    """Extract redirection operators and return (command_parts, output_file)"""
+    """Extract redirection operators and return (command_parts, output_file, error_file)"""
     output_file = None
+    error_file = None
     command_parts = []
     i = 0
     
     while i < len(parts):
         part = parts[i]
         
-        # Check for output redirection: > or 1>
+        # Check for stdout redirection: > or 1>
         if part == '>' or part == '1>':
             # Next part should be the filename
             if i + 1 < len(parts):
@@ -78,16 +79,28 @@ def parse_redirects(parts):
             output_file = part[2:]
             i += 1
             continue
-        elif part.startswith('>'):
-            # >file (no space)
+        elif part.startswith('>') and not part.startswith('>>'):
+            # >file (no space) - but not >>
             output_file = part[1:]
+            i += 1
+            continue
+        # Check for stderr redirection: 2>
+        elif part == '2>':
+            # Next part should be the filename
+            if i + 1 < len(parts):
+                error_file = parts[i + 1]
+                i += 2
+                continue
+        elif part.startswith('2>'):
+            # 2>file (no space)
+            error_file = part[2:]
             i += 1
             continue
         
         command_parts.append(part)
         i += 1
     
-    return command_parts, output_file
+    return command_parts, output_file, error_file
 
 
 def main():
@@ -107,7 +120,7 @@ def main():
             continue
         
         # Extract redirections
-        parts, output_file = parse_redirects(parts)
+        parts, output_file, error_file = parse_redirects(parts)
         if not parts:
             continue
         
@@ -216,12 +229,20 @@ def main():
                 # Check if file exists and is executable
                 if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
                     # Execute the program with arguments
-                    if output_file:
-                        # Redirect stdout to file
-                        with open(output_file, 'w') as f:
-                            result = subprocess.run([cmd_name] + parts[1:], stdout=f)
-                    else:
-                        result = subprocess.run([cmd_name] + parts[1:])
+                    stdout_dest = open(output_file, 'w') if output_file else None
+                    stderr_dest = open(error_file, 'w') if error_file else None
+                    
+                    result = subprocess.run(
+                        [cmd_name] + parts[1:],
+                        stdout=stdout_dest,
+                        stderr=stderr_dest
+                    )
+                    
+                    if stdout_dest:
+                        stdout_dest.close()
+                    if stderr_dest:
+                        stderr_dest.close()
+                    
                     found = True
                     break
             
