@@ -1,6 +1,7 @@
 import sys
 import os
 import subprocess
+import readline
 
 
 def parse_command(command):
@@ -144,7 +145,25 @@ def parse_redirects(parts):
     return command_parts, output_file, output_mode, error_file, error_mode
 
 
+def completer(text, state):
+    """Tab completion function for readline"""
+    builtins = ["echo", "exit", "type", "pwd", "cd"]
+    
+    # Filter builtins that start with the text
+    matches = [cmd + ' ' for cmd in builtins if cmd.startswith(text)]
+    
+    # Return the state-th match
+    if state < len(matches):
+        return matches[state]
+    else:
+        return None
+
+
 def main():
+    # Set up readline for tab completion
+    readline.parse_and_bind("tab: complete")
+    readline.set_completer(completer)
+    
     # List of builtin commands
     builtins = ["echo", "exit", "type", "pwd", "cd"]
     
@@ -153,7 +172,10 @@ def main():
         sys.stdout.flush()
         
         # Wait for user input
-        command = input()
+        try:
+            command = input()
+        except EOFError:
+            break
         
         # Parse command with quote handling
         parts = parse_command(command)
@@ -295,7 +317,6 @@ def main():
             if not found:
                 # Print error message for commands not found
                 print(f"{cmd_name}: command not found")
-                print(akshay)
 
 
 if __name__ == "__main__":
