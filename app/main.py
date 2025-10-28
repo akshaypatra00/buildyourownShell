@@ -79,7 +79,6 @@ def parse_arguments(command: str) -> Tuple[str, List[str], str, str]:
             filename = args[out_op_idx + 1]
             args = args[:out_op_idx]
         else:
-            # Redirection operator without filename
             args = args[:out_op_idx]
 
     return (cmd, args, filename, redirect_mode)
@@ -87,11 +86,11 @@ def parse_arguments(command: str) -> Tuple[str, List[str], str, str]:
 
 def execute_pipeline(command: str):
     """Execute a pipeline of commands"""
-    # Split by pipe
     commands_list = command.split('|')
     commands_list = [cmd.strip() for cmd in commands_list]
     
     processes = []
+    prev_stdout = None
     
     for i, cmd_str in enumerate(commands_list):
         try:
@@ -106,22 +105,42 @@ def execute_pipeline(command: str):
         cmd = cmd_parts[0]
         args = cmd_parts[1:] if len(cmd_parts) > 1 else []
         
-        # Determine stdin for this command
-        if i == 0:
-            stdin = None
-        else:
-            stdin = processes[-1].stdout
+        # Determine if this is a builtin
+        is_builtin = cmd in ["echo", "type", "pwd"]
         
-        # Check if it's a builtin
-        if cmd in ["echo", "type", "pwd"]:
-            # For builtins in pipeline - last command only
-            if i == len(commands_list) - 1:
-                # Read and discard previous output
-                if stdin:
-                    stdin.read()
-                    stdin.close()
+        if is_builtin:
+            # Builtin command
+            if i == 0:
+                # First command - execute and capture output
+                if cmd == "echo":
+                    output = " ".join(args) + "\n"
+                elif cmd == "type":
+                    if len(args) == 0:
+                        output = "type: missing argument\n"
+                    elif args[0] in commands:
+                        output = "{} is a shell builtin\n".format(args[0])
+                    elif path := shutil.which(args[0]):
+                        output = "{} is {}\n".format(args[0], path)
+                    else:
+                        output = "{}: not found\n".format(args[0])
+                elif cmd == "pwd":
+                    output = os.getcwd() + "\n"
                 
-                # Execute builtin normally to stdout
+                # Create a process to pipe this output
+                proc = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+                proc.stdin.write(output)
+                proc.stdin.close()
+                processes.append(proc)
+                prev_stdout = proc.stdout
+            
+            elif i == len(commands_list) - 1:
+                # Last command - read from previous, execute builtin, output to stdout
+                if prev_stdout:
+                    # Consume the input but ignore it for type/pwd/echo
+                    prev_stdout.read()
+                    prev_stdout.close()
+                
+                # Execute builtin to stdout
                 if cmd == "echo":
                     print(" ".join(args))
                 elif cmd == "type":
@@ -135,6 +154,27 @@ def execute_pipeline(command: str):
                         print("{}: not found".format(args[0]))
                 elif cmd == "pwd":
                     print(os.getcwd())
+            else:
+                # Middle command (rare for builtins)
+                if cmd == "echo":
+                    output = " ".join(args) + "\n"
+                elif cmd == "type":
+                    if len(args) == 0:
+                        output = "type: missing argument\n"
+                    elif args[0] in commands:
+                        output = "{} is a shell builtin\n".format(args[0])
+                    elif path := shutil.which(args[0]):
+                        output = "{} is {}\n".format(args[0], path)
+                    else:
+                        output = "{}: not found\n".format(args[0])
+                elif cmd == "pwd":
+                    output = os.getcwd() + "\n"
+                
+                proc = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+                proc.stdin.write(output)
+                proc.stdin.close()
+                processes.append(proc)
+                prev_stdout = proc.stdout
         else:
             # External command
             if cmd in executables:
@@ -143,23 +183,29 @@ def execute_pipeline(command: str):
                 cmd_path = shutil.which(cmd)
             
             if cmd_path:
-                if i == len(commands_list) - 1:
+                if i == 0:
+                    # First command
+                    proc = subprocess.Popen([cmd_path] + args, stdout=subprocess.PIPE)
+                    processes.append(proc)
+                    prev_stdout = proc.stdout
+                elif i == len(commands_list) - 1:
                     # Last command
-                    proc = subprocess.Popen([cmd_path] + args, stdin=stdin)
+                    proc = subprocess.Popen([cmd_path] + args, stdin=prev_stdout)
                     processes.append(proc)
+                    if len(processes) > 1:
+                        processes[-2].stdout.close()
                 else:
-                    # Not last command
-                    proc = subprocess.Popen([cmd_path] + args, stdin=stdin, stdout=subprocess.PIPE)
+                    # Middle command
+                    proc = subprocess.Popen([cmd_path] + args, stdin=prev_stdout, stdout=subprocess.PIPE)
                     processes.append(proc)
-                
-                # Close the previous stdout after passing it
-                if stdin and i > 0 and len(processes) > 1:
-                    processes[-2].stdout.close()
+                    if len(processes) > 1:
+                        processes[-2].stdout.close()
+                    prev_stdout = proc.stdout
             else:
                 print("{}: command not found".format(cmd))
                 return
     
-    # Wait for all processes to complete
+    # Wait for all processes
     for proc in processes:
         proc.wait()
 
@@ -271,7 +317,6 @@ def parse_command(command: str):
 
 
 def main():
-    # Wait for user input
     try:
         command = input("$ ")
         parse_command(command)
