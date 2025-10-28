@@ -395,7 +395,14 @@ def parse_command(command: str):
     if cmd == "exit":
         err_code = 0
         if len(args) > 0:
-            err_code = int(args[0])
+            try:
+                err_code = int(args[0])
+            except ValueError:
+                # Bash exits with 255 for non-numeric exit code
+                print(f"shell: exit: {args[0]}: numeric argument required", file=sys.stderr)
+                err_code = 255 
+        
+        save_history_on_exit() # Save history before exiting
         sys.exit(err_code)
 
     if cmd == "pwd":
@@ -522,12 +529,29 @@ def parse_command(command: str):
         stderr_file.close()
 
 
+def save_history_on_exit():
+    """
+    Saves the in-memory history to the file specified by HISTFILE.
+    """
+    histfile_path = os.getenv("HISTFILE")
+    if histfile_path:
+        try:
+            # Overwrite the history file with the current in-memory history
+            with open(histfile_path, "w") as f:
+                for hist_cmd in history_list:
+                    f.write(f"{hist_cmd}\n")
+        except Exception as e:
+            print(f"shell: error writing history to {histfile_path}: {e}", file=sys.stderr)
+
+
 def main():
     try:
         command = input("$ ")
         parse_command(command)
         main()
     except EOFError:
+        # Handle Ctrl+D exit
+        save_history_on_exit()
         sys.exit(0)
     except KeyboardInterrupt:
         print()
