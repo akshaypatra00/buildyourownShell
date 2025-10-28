@@ -126,8 +126,17 @@ def execute_pipeline(command: str):
                 elif cmd == "pwd":
                     output = os.getcwd() + "\n"
                 elif cmd == "history":
+                    # Determine how many to show
+                    if len(args) > 0:
+                        n = int(args[0])
+                        entries = history_list[-n:]
+                        start_idx = len(history_list) - n + 1
+                    else:
+                        entries = history_list
+                        start_idx = 1
+                    
                     output = ""
-                    for idx, hist_cmd in enumerate(history_list, 1):
+                    for idx, hist_cmd in enumerate(entries, start_idx):
                         output += "    {}  {}\n".format(idx, hist_cmd)
                 else:
                     output = ""
@@ -161,7 +170,16 @@ def execute_pipeline(command: str):
                 elif cmd == "pwd":
                     print(os.getcwd())
                 elif cmd == "history":
-                    for idx, hist_cmd in enumerate(history_list, 1):
+                    # Determine how many to show
+                    if len(args) > 0:
+                        n = int(args[0])
+                        entries = history_list[-n:]
+                        start_idx = len(history_list) - n + 1
+                    else:
+                        entries = history_list
+                        start_idx = 1
+                    
+                    for idx, hist_cmd in enumerate(entries, start_idx):
                         print("    {}  {}".format(idx, hist_cmd))
         else:
             # External command
@@ -287,8 +305,18 @@ def parse_command(command: str):
         return
 
     if cmd == "history":
-        for idx, hist_cmd in enumerate(history_list, 1):
+        # Determine how many to show
+        if len(args) > 0:
+            n = int(args[0])
+            entries = history_list[-n:]
+            start_idx = len(history_list) - n + 1
+        else:
+            entries = history_list
+            start_idx = 1
+        
+        for idx, hist_cmd in enumerate(entries, start_idx):
             print("    {}  {}".format(idx, hist_cmd), file=output)
+        
         if stdout_file:
             stdout_file.close()
         if stderr_file:
