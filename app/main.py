@@ -548,6 +548,27 @@ def load_exec():
             except PermissionError:
                 continue
 
+def load_history_on_startup():
+    """
+    Loads history from the file specified by HISTFILE environment variable
+    at shell startup.
+    """
+    global history_list, history_saved_index # Need to modify globals
+    histfile_path = os.getenv("HISTFILE")
+    
+    if histfile_path and os.path.exists(histfile_path):
+        try:
+            with open(histfile_path, "r") as f:
+                for line in f:
+                    command_from_file = line.strip()
+                    if command_from_file:
+                        history_list.append(command_from_file)
+            # Mark all loaded commands as 'saved'
+            history_saved_index = len(history_list)
+        except Exception as e:
+            # Print error but continue startup
+            print(f"shell: error loading history from {histfile_path}: {e}", file=sys.stderr)
+
 
 if __name__ == "__main__":
     commands = ["echo", "exit", "type", "pwd", "cd", "history"]
@@ -557,6 +578,8 @@ if __name__ == "__main__":
     history_saved_index = 0 # Track how many commands are saved
 
     load_exec()
+    load_history_on_startup() # Load history from HISTFILE
+    
     readline.set_completer(completer)
     readline.parse_and_bind("tab: complete")
     main()
