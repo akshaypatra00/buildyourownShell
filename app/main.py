@@ -86,6 +86,7 @@ def parse_arguments(command: str) -> Tuple[str, List[str], str, str]:
 
 def execute_pipeline(command: str):
     """Execute a pipeline of commands"""
+    global history_saved_index # Need access to global state
     commands_list = command.split('|')
     commands_list = [cmd.strip() for cmd in commands_list]
     
@@ -139,13 +140,13 @@ def execute_pipeline(command: str):
                                             command_from_file = line.strip()
                                             if command_from_file:
                                                 history_list.append(command_from_file)
+                                    history_saved_index = len(history_list) # Mark as saved
                                 else:
                                     print(f"history: {history_file_path}: No such file or directory", file=sys.stderr)
                             else:
                                 print("history: -r: option requires an argument", file=sys.stderr)
                         except Exception as e:
                             print(f"history: error reading file: {e}", file=sys.stderr)
-                        # No stdout output for -r
                     
                     elif "-w" in args:
                         # Handle writing to file
@@ -156,11 +157,28 @@ def execute_pipeline(command: str):
                                 with open(history_file_path, "w") as f:
                                     for hist_cmd in history_list:
                                         f.write(f"{hist_cmd}\n")
+                                history_saved_index = len(history_list) # Mark as saved
                             else:
                                 print("history: -w: option requires an argument", file=sys.stderr)
                         except Exception as e:
                             print(f"history: error writing file: {e}", file=sys.stderr)
-                        # No stdout output for -w
+
+                    elif "-a" in args:
+                        # Handle appending to file
+                        try:
+                            a_index = args.index("-a")
+                            if a_index + 1 < len(args):
+                                history_file_path = args[a_index + 1]
+                                # Get only new commands
+                                commands_to_append = history_list[history_saved_index:]
+                                with open(history_file_path, "a") as f:
+                                    for hist_cmd in commands_to_append:
+                                        f.write(f"{hist_cmd}\n")
+                                history_saved_index = len(history_list) # Mark new ones as saved
+                            else:
+                                print("history: -a: option requires an argument", file=sys.stderr)
+                        except Exception as e:
+                            print(f"history: error appending file: {e}", file=sys.stderr)
 
                     else:
                         # Original logic: display history
@@ -222,13 +240,13 @@ def execute_pipeline(command: str):
                                             command_from_file = line.strip()
                                             if command_from_file:
                                                 history_list.append(command_from_file)
+                                    history_saved_index = len(history_list) # Mark as saved
                                 else:
                                     print(f"history: {history_file_path}: No such file or directory", file=sys.stderr)
                             else:
                                 print("history: -r: option requires an argument", file=sys.stderr)
                         except Exception as e:
                             print(f"history: error reading file: {e}", file=sys.stderr)
-                        # No stdout output for -r
                     
                     elif "-w" in args:
                         # Handle writing to file
@@ -239,11 +257,28 @@ def execute_pipeline(command: str):
                                 with open(history_file_path, "w") as f:
                                     for hist_cmd in history_list:
                                         f.write(f"{hist_cmd}\n")
+                                history_saved_index = len(history_list) # Mark as saved
                             else:
                                 print("history: -w: option requires an argument", file=sys.stderr)
                         except Exception as e:
                             print(f"history: error writing file: {e}", file=sys.stderr)
-                        # No stdout output for -w
+                    
+                    elif "-a" in args:
+                        # Handle appending to file
+                        try:
+                            a_index = args.index("-a")
+                            if a_index + 1 < len(args):
+                                history_file_path = args[a_index + 1]
+                                # Get only new commands
+                                commands_to_append = history_list[history_saved_index:]
+                                with open(history_file_path, "a") as f:
+                                    for hist_cmd in commands_to_append:
+                                        f.write(f"{hist_cmd}\n")
+                                history_saved_index = len(history_list) # Mark new ones as saved
+                            else:
+                                print("history: -a: option requires an argument", file=sys.stderr)
+                        except Exception as e:
+                            print(f"history: error appending file: {e}", file=sys.stderr)
 
                     else:
                         # Original logic: display history
@@ -385,6 +420,7 @@ def parse_command(command: str):
         return
 
     if cmd == "history":
+        global history_saved_index # Need to modify global state
         # Check for the -r (read from file) flag
         if "-r" in args:
             try:
@@ -398,6 +434,7 @@ def parse_command(command: str):
                                 # Add non-empty lines to history
                                 if command_from_file:
                                     history_list.append(command_from_file)
+                        history_saved_index = len(history_list) # Mark as saved
                     else:
                         print(f"history: {history_file_path}: No such file or directory", file=sys.stderr)
                 else:
@@ -415,10 +452,29 @@ def parse_command(command: str):
                     with open(history_file_path, "w") as f:
                         for hist_cmd in history_list:
                             f.write(f"{hist_cmd}\n")
+                    history_saved_index = len(history_list) # Mark as saved
                 else:
                     print("history: -w: option requires an argument", file=sys.stderr)
             except Exception as e:
                 print(f"history: error writing file: {e}", file=sys.stderr)
+
+        # Check for the -a (append to file) flag
+        elif "-a" in args:
+            try:
+                a_index = args.index("-a")
+                if a_index + 1 < len(args):
+                    history_file_path = args[a_index + 1]
+                    # Get only new commands
+                    commands_to_append = history_list[history_saved_index:]
+                    # Open file in append mode
+                    with open(history_file_path, "a") as f:
+                        for hist_cmd in commands_to_append:
+                            f.write(f"{hist_cmd}\n")
+                    history_saved_index = len(history_list) # Mark new ones as saved
+                else:
+                    print("history: -a: option requires an argument", file=sys.stderr)
+            except Exception as e:
+                print(f"history: error appending file: {e}", file=sys.stderr)
 
         # Original logic: display history
         else:
@@ -498,6 +554,7 @@ if __name__ == "__main__":
     executables = {}
     tab_state = {"count": 0, "last_text": ""}
     history_list = []
+    history_saved_index = 0 # Track how many commands are saved
 
     load_exec()
     readline.set_completer(completer)
