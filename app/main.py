@@ -126,18 +126,43 @@ def execute_pipeline(command: str):
                 elif cmd == "pwd":
                     output = os.getcwd() + "\n"
                 elif cmd == "history":
-                    # Determine how many to show
-                    if len(args) > 0:
-                        n = int(args[0])
-                        entries = history_list[-n:]
-                        start_idx = len(history_list) - n + 1
-                    else:
-                        entries = history_list
-                        start_idx = 1
+                    output = "" # Default to no output
+                    if "-r" in args:
+                        # Handle reading from file
+                        try:
+                            r_index = args.index("-r")
+                            if r_index + 1 < len(args):
+                                history_file_path = args[r_index + 1]
+                                if os.path.exists(history_file_path):
+                                    with open(history_file_path, "r") as f:
+                                        for line in f:
+                                            command_from_file = line.strip()
+                                            if command_from_file:
+                                                history_list.append(command_from_file)
+                                else:
+                                    print(f"history: {history_file_path}: No such file or directory", file=sys.stderr)
+                            else:
+                                print("history: -r: option requires an argument", file=sys.stderr)
+                        except Exception as e:
+                            print(f"history: error reading file: {e}", file=sys.stderr)
+                        # No stdout output for -r
                     
-                    output = ""
-                    for idx, hist_cmd in enumerate(entries, start_idx):
-                        output += "    {}  {}\n".format(idx, hist_cmd)
+                    else:
+                        # Original logic: display history
+                        if len(args) > 0:
+                            try:
+                                n = int(args[0])
+                                entries = history_list[-n:]
+                                start_idx = len(history_list) - n + 1
+                            except ValueError:
+                                entries = history_list
+                                start_idx = 1
+                        else:
+                            entries = history_list
+                            start_idx = 1
+                        
+                        for idx, hist_cmd in enumerate(entries, start_idx):
+                            output += "     {}  {}\n".format(idx, hist_cmd)
                 else:
                     output = ""
                 
@@ -170,17 +195,42 @@ def execute_pipeline(command: str):
                 elif cmd == "pwd":
                     print(os.getcwd())
                 elif cmd == "history":
-                    # Determine how many to show
-                    if len(args) > 0:
-                        n = int(args[0])
-                        entries = history_list[-n:]
-                        start_idx = len(history_list) - n + 1
-                    else:
-                        entries = history_list
-                        start_idx = 1
+                    if "-r" in args:
+                        # Handle reading from file
+                        try:
+                            r_index = args.index("-r")
+                            if r_index + 1 < len(args):
+                                history_file_path = args[r_index + 1]
+                                if os.path.exists(history_file_path):
+                                    with open(history_file_path, "r") as f:
+                                        for line in f:
+                                            command_from_file = line.strip()
+                                            if command_from_file:
+                                                history_list.append(command_from_file)
+                                else:
+                                    print(f"history: {history_file_path}: No such file or directory", file=sys.stderr)
+                            else:
+                                print("history: -r: option requires an argument", file=sys.stderr)
+                        except Exception as e:
+                            print(f"history: error reading file: {e}", file=sys.stderr)
+                        # No stdout output for -r
                     
-                    for idx, hist_cmd in enumerate(entries, start_idx):
-                        print("    {}  {}".format(idx, hist_cmd))
+                    else:
+                        # Original logic: display history
+                        if len(args) > 0:
+                            try:
+                                n = int(args[0])
+                                entries = history_list[-n:]
+                                start_idx = len(history_list) - n + 1
+                            except ValueError:
+                                entries = history_list
+                                start_idx = 1
+                        else:
+                            entries = history_list
+                            start_idx = 1
+                        
+                        for idx, hist_cmd in enumerate(entries, start_idx):
+                            print("     {}  {}".format(idx, hist_cmd))
         else:
             # External command
             if cmd in executables:
@@ -305,18 +355,45 @@ def parse_command(command: str):
         return
 
     if cmd == "history":
-        # Determine how many to show
-        if len(args) > 0:
-            n = int(args[0])
-            entries = history_list[-n:]
-            start_idx = len(history_list) - n + 1
+        # Check for the -r (read from file) flag
+        if "-r" in args:
+            try:
+                r_index = args.index("-r")
+                if r_index + 1 < len(args):
+                    history_file_path = args[r_index + 1]
+                    if os.path.exists(history_file_path):
+                        with open(history_file_path, "r") as f:
+                            for line in f:
+                                command_from_file = line.strip()
+                                # Add non-empty lines to history
+                                if command_from_file:
+                                    history_list.append(command_from_file)
+                    else:
+                        print(f"history: {history_file_path}: No such file or directory", file=sys.stderr)
+                else:
+                    print("history: -r: option requires an argument", file=sys.stderr)
+            except Exception as e:
+                print(f"history: error reading file: {e}", file=sys.stderr)
+        
+        # Original logic: display history
         else:
-            entries = history_list
-            start_idx = 1
+            if len(args) > 0:
+                try:
+                    n = int(args[0])
+                    entries = history_list[-n:]
+                    start_idx = len(history_list) - n + 1
+                except ValueError:
+                    # Handle if arg is not a number
+                    entries = history_list
+                    start_idx = 1
+            else:
+                entries = history_list
+                start_idx = 1
+            
+            for idx, hist_cmd in enumerate(entries, start_idx):
+                print("     {}  {}".format(idx, hist_cmd), file=output)
         
-        for idx, hist_cmd in enumerate(entries, start_idx):
-            print("    {}  {}".format(idx, hist_cmd), file=output)
-        
+        # Close redirection files if opened
         if stdout_file:
             stdout_file.close()
         if stderr_file:
