@@ -106,7 +106,7 @@ def execute_pipeline(command: str):
         args = cmd_parts[1:] if len(cmd_parts) > 1 else []
         
         # Determine if this is a builtin
-        is_builtin = cmd in ["echo", "type", "pwd"]
+        is_builtin = cmd in commands
         
         if is_builtin:
             # Builtin command
@@ -125,6 +125,12 @@ def execute_pipeline(command: str):
                         output = "{}: not found\n".format(args[0])
                 elif cmd == "pwd":
                     output = os.getcwd() + "\n"
+                elif cmd == "history":
+                    output = ""
+                    for idx, hist_cmd in enumerate(history_list, 1):
+                        output += "    {}  {}\n".format(idx, hist_cmd)
+                else:
+                    output = ""
                 
                 # Create a process to pipe this output
                 proc = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
@@ -136,7 +142,7 @@ def execute_pipeline(command: str):
             elif i == len(commands_list) - 1:
                 # Last command - read from previous, execute builtin, output to stdout
                 if prev_stdout:
-                    # Consume the input but ignore it for type/pwd/echo
+                    # Consume the input but ignore it for most builtins
                     prev_stdout.read()
                     prev_stdout.close()
                 
@@ -154,27 +160,9 @@ def execute_pipeline(command: str):
                         print("{}: not found".format(args[0]))
                 elif cmd == "pwd":
                     print(os.getcwd())
-            else:
-                # Middle command (rare for builtins)
-                if cmd == "echo":
-                    output = " ".join(args) + "\n"
-                elif cmd == "type":
-                    if len(args) == 0:
-                        output = "type: missing argument\n"
-                    elif args[0] in commands:
-                        output = "{} is a shell builtin\n".format(args[0])
-                    elif path := shutil.which(args[0]):
-                        output = "{} is {}\n".format(args[0], path)
-                    else:
-                        output = "{}: not found\n".format(args[0])
-                elif cmd == "pwd":
-                    output = os.getcwd() + "\n"
-                
-                proc = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-                proc.stdin.write(output)
-                proc.stdin.close()
-                processes.append(proc)
-                prev_stdout = proc.stdout
+                elif cmd == "history":
+                    for idx, hist_cmd in enumerate(history_list, 1):
+                        print("    {}  {}".format(idx, hist_cmd))
         else:
             # External command
             if cmd in executables:
@@ -184,18 +172,18 @@ def execute_pipeline(command: str):
             
             if cmd_path:
                 if i == 0:
-                    # First command - pass command name, not path
+                    # First command
                     proc = subprocess.Popen([cmd] + args, stdout=subprocess.PIPE)
                     processes.append(proc)
                     prev_stdout = proc.stdout
                 elif i == len(commands_list) - 1:
-                    # Last command - pass command name, not path
+                    # Last command
                     proc = subprocess.Popen([cmd] + args, stdin=prev_stdout)
                     processes.append(proc)
                     if len(processes) > 1:
                         processes[-2].stdout.close()
                 else:
-                    # Middle command - pass command name, not path
+                    # Middle command
                     proc = subprocess.Popen([cmd] + args, stdin=prev_stdout, stdout=subprocess.PIPE)
                     processes.append(proc)
                     if len(processes) > 1:
@@ -211,6 +199,9 @@ def execute_pipeline(command: str):
 
 
 def parse_command(command: str):
+    # Add to history
+    history_list.append(command)
+    
     # Check if command contains a pipe
     if '|' in command:
         execute_pipeline(command)
@@ -295,14 +286,22 @@ def parse_command(command: str):
             stderr_file.close()
         return
 
-    # External commands - pass command name, not full path
+    if cmd == "history":
+        for idx, hist_cmd in enumerate(history_list, 1):
+            print("    {}  {}".format(idx, hist_cmd), file=output)
+        if stdout_file:
+            stdout_file.close()
+        if stderr_file:
+            stderr_file.close()
+        return
+
+    # External commands
     if cmd in executables:
         cmd_path = executables[cmd]
     else:
         cmd_path = shutil.which(cmd)
     
     if cmd_path:
-        # Use cmd (name) not cmd_path (full path) as first argument
         subprocess.run([cmd] + args, stdout=stdout_file, stderr=stderr_file)
         if stdout_file:
             stdout_file.close()
@@ -345,9 +344,10 @@ def load_exec():
 
 
 if __name__ == "__main__":
-    commands = ["echo", "exit", "type", "pwd", "cd"]
+    commands = ["echo", "exit", "type", "pwd", "cd", "history"]
     executables = {}
     tab_state = {"count": 0, "last_text": ""}
+    history_list = []
 
     load_exec()
     readline.set_completer(completer)
