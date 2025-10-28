@@ -147,6 +147,21 @@ def execute_pipeline(command: str):
                             print(f"history: error reading file: {e}", file=sys.stderr)
                         # No stdout output for -r
                     
+                    elif "-w" in args:
+                        # Handle writing to file
+                        try:
+                            w_index = args.index("-w")
+                            if w_index + 1 < len(args):
+                                history_file_path = args[w_index + 1]
+                                with open(history_file_path, "w") as f:
+                                    for hist_cmd in history_list:
+                                        f.write(f"{hist_cmd}\n")
+                            else:
+                                print("history: -w: option requires an argument", file=sys.stderr)
+                        except Exception as e:
+                            print(f"history: error writing file: {e}", file=sys.stderr)
+                        # No stdout output for -w
+
                     else:
                         # Original logic: display history
                         if len(args) > 0:
@@ -215,6 +230,21 @@ def execute_pipeline(command: str):
                             print(f"history: error reading file: {e}", file=sys.stderr)
                         # No stdout output for -r
                     
+                    elif "-w" in args:
+                        # Handle writing to file
+                        try:
+                            w_index = args.index("-w")
+                            if w_index + 1 < len(args):
+                                history_file_path = args[w_index + 1]
+                                with open(history_file_path, "w") as f:
+                                    for hist_cmd in history_list:
+                                        f.write(f"{hist_cmd}\n")
+                            else:
+                                print("history: -w: option requires an argument", file=sys.stderr)
+                        except Exception as e:
+                            print(f"history: error writing file: {e}", file=sys.stderr)
+                        # No stdout output for -w
+
                     else:
                         # Original logic: display history
                         if len(args) > 0:
@@ -375,6 +405,21 @@ def parse_command(command: str):
             except Exception as e:
                 print(f"history: error reading file: {e}", file=sys.stderr)
         
+        # Check for the -w (write to file) flag
+        elif "-w" in args:
+            try:
+                w_index = args.index("-w")
+                if w_index + 1 < len(args):
+                    history_file_path = args[w_index + 1]
+                    # Open file in write mode (create or truncate)
+                    with open(history_file_path, "w") as f:
+                        for hist_cmd in history_list:
+                            f.write(f"{hist_cmd}\n")
+                else:
+                    print("history: -w: option requires an argument", file=sys.stderr)
+            except Exception as e:
+                print(f"history: error writing file: {e}", file=sys.stderr)
+
         # Original logic: display history
         else:
             if len(args) > 0:
