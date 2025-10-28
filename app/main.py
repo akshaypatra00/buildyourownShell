@@ -184,19 +184,19 @@ def execute_pipeline(command: str):
             
             if cmd_path:
                 if i == 0:
-                    # First command
-                    proc = subprocess.Popen([cmd_path] + args, stdout=subprocess.PIPE)
+                    # First command - pass command name, not path
+                    proc = subprocess.Popen([cmd] + args, stdout=subprocess.PIPE)
                     processes.append(proc)
                     prev_stdout = proc.stdout
                 elif i == len(commands_list) - 1:
-                    # Last command
-                    proc = subprocess.Popen([cmd_path] + args, stdin=prev_stdout)
+                    # Last command - pass command name, not path
+                    proc = subprocess.Popen([cmd] + args, stdin=prev_stdout)
                     processes.append(proc)
                     if len(processes) > 1:
                         processes[-2].stdout.close()
                 else:
-                    # Middle command
-                    proc = subprocess.Popen([cmd_path] + args, stdin=prev_stdout, stdout=subprocess.PIPE)
+                    # Middle command - pass command name, not path
+                    proc = subprocess.Popen([cmd] + args, stdin=prev_stdout, stdout=subprocess.PIPE)
                     processes.append(proc)
                     if len(processes) > 1:
                         processes[-2].stdout.close()
@@ -295,14 +295,15 @@ def parse_command(command: str):
             stderr_file.close()
         return
 
-    # External commands
+    # External commands - pass command name, not full path
     if cmd in executables:
         cmd_path = executables[cmd]
     else:
         cmd_path = shutil.which(cmd)
     
     if cmd_path:
-        subprocess.run([cmd_path] + args, stdout=stdout_file, stderr=stderr_file)
+        # Use cmd (name) not cmd_path (full path) as first argument
+        subprocess.run([cmd] + args, stdout=stdout_file, stderr=stderr_file)
         if stdout_file:
             stdout_file.close()
         if stderr_file:
