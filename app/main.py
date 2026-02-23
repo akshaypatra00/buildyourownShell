@@ -6,7 +6,17 @@ import shlex
 import readline
 import subprocess
 
-    autocomplete_l
+
+def completer(text, state):
+    load_exec()
+    autocomplete_list = list(set(commands + list(executables.keys())))
+    autocomplete_list.sort()
+    matches = [cmd for cmd in autocomplete_list if cmd.startswith(text)]
+
+    # Reset the tab counter if text is modified
+    if tab_state["last_text"] != text:
+        tab_state["count"] = 0
+        tab_state["last_text"] = text
 
     if state == 0 and len(matches) > 1:
         if tab_state["count"] == 0:
