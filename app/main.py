@@ -6,11 +6,7 @@ import shlex
 import readline
 import subprocess
 
-    autocomplete_list = list(set(commands + list(executables.keys())))
-    autocomplete_list.sort()
-    matches = [cmd for cmd in autocomplete_list if cmd.startswith(text)]
-
-    # Reset the tab counter if text is modified
+    autocomplete_list = list(set(comm
     if tab_state["last_text"] != text:
         tab_state["count"] = 0
         tab_state["last_text"] = text
