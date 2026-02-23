@@ -6,9 +6,6 @@ import shlex
 import readline
 import subprocess
 
-
-def completer(text, state):
-    load_exec()
     autocomplete_list = list(set(commands + list(executables.keys())))
     autocomplete_list.sort()
     matches = [cmd for cmd in autocomplete_list if cmd.startswith(text)]
