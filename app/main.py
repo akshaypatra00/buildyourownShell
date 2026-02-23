@@ -6,10 +6,7 @@ import shlex
 import readline
 import subprocess
 
-    autocomplete_list = list(set(comm
-    if tab_state["last_text"] != text:
-        tab_state["count"] = 0
-        tab_state["last_text"] = text
+    autocomplete_l
 
     if state == 0 and len(matches) > 1:
         if tab_state["count"] == 0:
